@@ -1,176 +1,140 @@
 'use client'
 
-import { TrendingUp, TrendingDown, Minus, DollarSign, Bitcoin, BarChart3, Globe } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 
-interface PriceDisplayProps {
-  data: {
-    price: number
-    price_btc: number
-    volume_24h: number
-    market_cap: number
-    timestamp: string
-    error?: boolean
-  } | null
+interface PriceData {
+  symbol: string
+  price: number
+  price_btc: number
+  volume_24h: number
+  market_cap: number
+  timestamp: string
+  isMock?: boolean
 }
 
-export default function PriceDisplay({ data }: PriceDisplayProps) {
-  if (!data) {
-    return (
-      <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-6">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center">
-          <DollarSign className="w-5 h-5 mr-2 text-blue-600" />
-          实时价格
-        </h2>
-        <div className="text-center text-slate-500 dark:text-slate-400 py-8">
-          <div className="w-16 h-16 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-            <BarChart3 className="w-8 h-8 text-slate-400" />
-          </div>
-          <p>暂无数据</p>
-        </div>
-      </div>
-    )
+export default function PriceDisplay() {
+  const [priceData, setPriceData] = useState<PriceData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+
+  // 获取价格数据
+  const fetchPrice = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/price')
+      const data = await response.json()
+      setPriceData(data)
+      setLastUpdate(new Date())
+      setLoading(false)
+    } catch (error) {
+      console.error('获取价格数据失败:', error)
+      setLoading(false)
+    }
   }
 
-  if (data.error) {
-    return (
-      <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-6">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center">
-          <DollarSign className="w-5 h-5 mr-2 text-blue-600" />
-          实时价格
-        </h2>
-        <div className="text-center bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
-          <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <p className="font-medium text-yellow-800 dark:text-yellow-200">数据获取失败</p>
-          <p className="text-sm mt-1 text-yellow-600 dark:text-yellow-300">请检查网络连接或稍后重试</p>
-        </div>
-      </div>
-    )
-  }
+  // 自动刷新价格（每30秒）
+  useEffect(() => {
+    fetchPrice()
+    const interval = setInterval(fetchPrice, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
-  const formatPrice = (price: number) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(price)
+    }).format(amount)
   }
 
   const formatVolume = (volume: number) => {
     if (volume >= 1e9) {
-      return `${(volume / 1e9).toFixed(2)}B`
+      return `$${(volume / 1e9).toFixed(2)}B`
     } else if (volume >= 1e6) {
-      return `${(volume / 1e6).toFixed(2)}M`
+      return `$${(volume / 1e6).toFixed(2)}M`
     } else if (volume >= 1e3) {
-      return `${(volume / 1e3).toFixed(2)}K`
+      return `$${(volume / 1e3).toFixed(2)}K`
     }
-    return volume.toFixed(2)
+    return formatCurrency(volume)
   }
 
   const formatMarketCap = (marketCap: number) => {
     if (marketCap >= 1e12) {
-      return `${(marketCap / 1e12).toFixed(2)}T`
+      return `$${(marketCap / 1e12).toFixed(2)}T`
     } else if (marketCap >= 1e9) {
-      return `${(marketCap / 1e9).toFixed(2)}B`
+      return `$${(marketCap / 1e9).toFixed(2)}B`
     } else if (marketCap >= 1e6) {
-      return `${(marketCap / 1e6).toFixed(2)}M`
+      return `$${(marketCap / 1e6).toFixed(2)}M`
     }
-    return marketCap.toFixed(2)
+    return formatCurrency(marketCap)
+  }
+
+  if (loading && !priceData) {
+    return (
+      <div className="card">
+        <h2 className="text-xl font-semibold mb-4">实时价格</h2>
+        <div className="text-center text-gray-500">加载中...</div>
+      </div>
+    )
+  }
+
+  if (!priceData) {
+    return (
+      <div className="card">
+        <h2 className="text-xl font-semibold mb-4">实时价格</h2>
+        <div className="text-center text-gray-500">无法获取价格数据</div>
+      </div>
+    )
   }
 
   return (
-    <div className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm rounded-2xl shadow-xl border border-slate-200/50 dark:border-slate-700/50 p-6 hover:shadow-2xl transition-all duration-300">
-      <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center">
-        <DollarSign className="w-5 h-5 mr-2 text-blue-600" />
-        实时价格
-      </h2>
-      
-      <div className="space-y-6">
-        {/* SOL/USDT 价格 */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-4 border border-blue-200/50 dark:border-blue-800/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-                <DollarSign className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">SOL/USDT</span>
-                <p className="text-xs text-slate-500 dark:text-slate-500">美元价格</p>
-              </div>
-            </div>
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
-              {formatPrice(data.price)}
-            </span>
+    <div className="card">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">实时价格</h2>
+        <button
+          onClick={fetchPrice}
+          disabled={loading}
+          className="flex items-center text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+        >
+          <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+          刷新
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {/* 主要价格信息 */}
+        <div className="text-center">
+          <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            {formatCurrency(priceData.price)}
           </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            {priceData.price_btc.toFixed(8)} BTC
+          </div>
+          {priceData.isMock && (
+            <div className="text-xs text-yellow-600 mt-1">模拟数据</div>
+          )}
         </div>
 
-        {/* SOL/BTC 价格 */}
-        <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-xl p-4 border border-orange-200/50 dark:border-orange-800/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center mr-3">
-                <Bitcoin className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">SOL/BTC</span>
-                <p className="text-xs text-slate-500 dark:text-slate-500">比特币汇率</p>
-              </div>
-            </div>
-            <span className="text-lg font-semibold text-slate-900 dark:text-white">
-              {data.price_btc.toFixed(8)}
-            </span>
+        {/* 市场数据 */}
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+            <div className="text-gray-600 dark:text-gray-400 mb-1">24h成交量</div>
+            <div className="font-semibold">{formatVolume(priceData.volume_24h)}</div>
           </div>
-        </div>
-
-        {/* 24小时成交量 */}
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-4 border border-green-200/50 dark:border-green-800/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center mr-3">
-                <BarChart3 className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">24h 成交量</span>
-                <p className="text-xs text-slate-500 dark:text-slate-500">交易活跃度</p>
-              </div>
-            </div>
-            <span className="text-lg font-semibold text-slate-900 dark:text-white">
-              ${formatVolume(data.volume_24h)}
-            </span>
-          </div>
-        </div>
-
-        {/* 市值 */}
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl p-4 border border-purple-200/50 dark:border-purple-800/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center mr-3">
-                <Globe className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">市值</span>
-                <p className="text-xs text-slate-500 dark:text-slate-500">市场总价值</p>
-              </div>
-            </div>
-            <span className="text-lg font-semibold text-slate-900 dark:text-white">
-              ${formatMarketCap(data.market_cap)}
-            </span>
+          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+            <div className="text-gray-600 dark:text-gray-400 mb-1">市值</div>
+            <div className="font-semibold">{formatMarketCap(priceData.market_cap)}</div>
           </div>
         </div>
 
         {/* 更新时间 */}
-        <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500 dark:text-slate-400">更新时间</span>
-            <span className="text-slate-700 dark:text-slate-300 font-medium">
-              {new Date(data.timestamp).toLocaleString('zh-CN')}
-            </span>
+        {lastUpdate && (
+          <div className="text-xs text-gray-500 text-center">
+            最后更新: {lastUpdate.toLocaleString('zh-CN')}
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
