@@ -5,6 +5,14 @@ import { calculateStrategyScore } from '@/lib/indicators'
 // 获取策略评分
 export async function GET() {
   try {
+    // 检查环境变量
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing' },
+        { status: 500 }
+      )
+    }
+
     // 获取最新的技术指标数据
     const { data: indicators, error: indicatorsError } = await supabaseAdmin
       .from('latest_technical_indicators')

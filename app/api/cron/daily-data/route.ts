@@ -6,6 +6,14 @@ import axios from 'axios'
 // 每日数据抓取定时任务
 export async function GET() {
   try {
+    // 检查环境变量
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing' },
+        { status: 500 }
+      )
+    }
+
     // 获取SOL历史价格数据（最近100天）
     const response = await axios.get(
       'https://api.coingecko.com/api/v3/coins/solana/market_chart?vs_currency=usd&days=100&interval=daily'
