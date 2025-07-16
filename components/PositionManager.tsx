@@ -31,9 +31,11 @@ export default function PositionManager() {
     try {
       const response = await fetch('/api/positions')
       const data = await response.json()
-      setPositions(data)
+      // 确保数据是数组格式
+      setPositions(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('获取持仓数据失败:', error)
+      setPositions([])
     }
   }
 
@@ -63,9 +65,13 @@ export default function PositionManager() {
         setFormData({ position_type: 'LONG', entry_price: '', quantity: '' })
         setShowForm(false)
         fetchPositions()
+      } else {
+        const errorData = await response.json()
+        alert(`创建持仓失败: ${errorData.error || '未知错误'}`)
       }
     } catch (error) {
       console.error('创建持仓失败:', error)
+      alert('创建持仓失败，请重试')
     }
   }
 
@@ -82,9 +88,13 @@ export default function PositionManager() {
 
       if (response.ok) {
         fetchPositions()
+      } else {
+        const errorData = await response.json()
+        alert(`平仓失败: ${errorData.error || '未知错误'}`)
       }
     } catch (error) {
       console.error('平仓失败:', error)
+      alert('平仓失败，请重试')
     }
   }
 

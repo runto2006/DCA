@@ -1,6 +1,6 @@
 'use client'
 
-import { TrendingUp, TrendingDown, Minus, Target, BarChart3 } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Target, BarChart3, Brain, Zap, Activity } from 'lucide-react'
 
 interface StrategyPanelProps {
   data: {
@@ -12,6 +12,8 @@ interface StrategyPanelProps {
     recommendation: string
     current_price: number
     timestamp: string
+    error?: boolean
+    isMock?: boolean
   } | null
 }
 
@@ -21,6 +23,18 @@ export default function StrategyPanel({ data }: StrategyPanelProps) {
       <div className="card">
         <h2 className="text-xl font-semibold mb-4">策略评分</h2>
         <div className="text-center text-gray-500">暂无数据</div>
+      </div>
+    )
+  }
+
+  if (data.error) {
+    return (
+      <div className="card">
+        <h2 className="text-xl font-semibold mb-4">策略评分</h2>
+        <div className="text-center text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+          <p className="font-medium">数据获取失败</p>
+          <p className="text-sm mt-1">请检查网络连接或稍后重试</p>
+        </div>
       </div>
     )
   }

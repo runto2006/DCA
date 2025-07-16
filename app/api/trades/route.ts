@@ -6,10 +6,8 @@ export async function GET() {
   try {
     const supabaseAdmin = getSupabaseAdmin()
     if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Supabase configuration missing' },
-        { status: 500 }
-      )
+      console.warn('Supabase configuration missing, returning empty array')
+      return NextResponse.json([])
     }
 
     const { data, error } = await supabaseAdmin
@@ -19,18 +17,14 @@ export async function GET() {
       .limit(50)
 
     if (error) {
-      return NextResponse.json(
-        { error: '获取交易历史失败' },
-        { status: 500 }
-      )
+      console.error('获取交易历史失败:', error)
+      return NextResponse.json([])
     }
 
-    return NextResponse.json(data)
+    // 确保返回数组格式
+    return NextResponse.json(Array.isArray(data) ? data : [])
   } catch (error) {
     console.error('获取交易历史失败:', error)
-    return NextResponse.json(
-      { error: '获取交易历史失败' },
-      { status: 500 }
-    )
+    return NextResponse.json([])
   }
 } 

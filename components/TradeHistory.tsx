@@ -23,10 +23,12 @@ export default function TradeHistory() {
     try {
       const response = await fetch('/api/trades')
       const data = await response.json()
-      setTrades(data)
+      // 确保数据是数组格式
+      setTrades(Array.isArray(data) ? data : [])
       setLoading(false)
     } catch (error) {
       console.error('获取交易历史失败:', error)
+      setTrades([])
       setLoading(false)
     }
   }

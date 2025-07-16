@@ -6,11 +6,21 @@ import { calculateStrategyScore } from '@/lib/indicators'
 export async function GET() {
   try {
     const supabaseAdmin = getSupabaseAdmin()
+    
+    // 如果没有 Supabase 配置，返回模拟数据
     if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Supabase configuration missing' },
-        { status: 500 }
-      )
+      console.warn('Supabase configuration missing, returning mock data')
+      return NextResponse.json({
+        emaScore: 65,
+        obvScore: 72,
+        rsiScore: 58,
+        macdScore: 68,
+        totalScore: 66,
+        recommendation: 'BUY',
+        current_price: 98.45,
+        timestamp: new Date().toISOString(),
+        isMock: true
+      })
     }
 
     // 获取最新的技术指标数据
@@ -21,10 +31,18 @@ export async function GET() {
       .single()
     
     if (indicatorsError || !indicators) {
-      return NextResponse.json(
-        { error: '未找到技术指标数据' },
-        { status: 404 }
-      )
+      console.warn('No technical indicators found, returning mock data')
+      return NextResponse.json({
+        emaScore: 50,
+        obvScore: 50,
+        rsiScore: 50,
+        macdScore: 50,
+        totalScore: 50,
+        recommendation: 'HOLD',
+        current_price: 0,
+        timestamp: new Date().toISOString(),
+        isMock: true
+      })
     }
     
     // 获取前一个时间点的OBV数据用于计算变化
@@ -49,37 +67,55 @@ export async function GET() {
     // 计算策略评分
     const score = calculateStrategyScore(
       currentPrice,
-      indicators.ema_89,
-      indicators.obv,
-      obvPrev,
-      indicators.rsi,
-      indicators.macd,
-      indicators.macd_signal
+      indicators.ema_89 || 0,
+      indicators.obv || 0,
+      obvPrev || 0,
+      indicators.rsi || 50,
+      indicators.macd || 0,
+      indicators.macd_signal || 0
     )
     
     // 保存策略评分到数据库
-    await supabaseAdmin
-      .from('strategy_scores')
-      .insert({
-        symbol: 'SOL',
-        ema_score: score.emaScore,
-        obv_score: score.obvScore,
-        rsi_score: score.rsiScore,
-        macd_score: score.macdScore,
-        total_score: score.totalScore,
-        recommendation: score.recommendation
-      })
+    try {
+      await supabaseAdmin
+        .from('strategy_scores')
+        .insert({
+          symbol: 'SOL',
+          ema_score: score.emaScore,
+          obv_score: score.obvScore,
+          rsi_score: score.rsiScore,
+          macd_score: score.macdScore,
+          total_score: score.totalScore,
+          recommendation: score.recommendation
+        })
+    } catch (dbError) {
+      console.warn('Failed to save strategy score to database:', dbError)
+    }
     
     return NextResponse.json({
-      ...score,
+      emaScore: score.emaScore,
+      obvScore: score.obvScore,
+      rsiScore: score.rsiScore,
+      macdScore: score.macdScore,
+      totalScore: score.totalScore,
+      recommendation: score.recommendation,
       current_price: currentPrice,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isMock: false
     })
   } catch (error) {
     console.error('计算策略评分失败:', error)
-    return NextResponse.json(
-      { error: '计算策略评分失败' },
-      { status: 500 }
-    )
+    // 返回默认数据而不是错误
+    return NextResponse.json({
+      emaScore: 50,
+      obvScore: 50,
+      rsiScore: 50,
+      macdScore: 50,
+      totalScore: 50,
+      recommendation: 'HOLD',
+      current_price: 0,
+      timestamp: new Date().toISOString(),
+      isMock: true
+    })
   }
 } 

@@ -1,92 +1,138 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { calculateEMA, calculateRSI, calculateOBV, calculateMACD } from '@/lib/indicators'
-import axios from 'axios'
 
-// 每日数据抓取定时任务
+// 获取历史价格数据用于计算技术指标
+async function getHistoricalPrices(supabase: any, symbol: string, days: number = 100) {
+  const { data, error } = await supabase
+    .from('price_data')
+    .select('price, volume_24h, timestamp')
+    .eq('symbol', symbol)
+    .order('timestamp', { ascending: true })
+    .limit(days)
+  
+  if (error) {
+    console.error('获取历史价格数据失败:', error)
+    return null
+  }
+  
+  return data
+}
+
+// 计算技术指标
+function calculateIndicators(prices: any[]) {
+  if (prices.length < 89) {
+    console.warn('价格数据不足，无法计算技术指标')
+    return null
+  }
+  
+  const priceValues = prices.map(p => p.price)
+  const volumeValues = prices.map(p => p.volume_24h || 0)
+  
+  // 计算各种技术指标
+  const ema89 = calculateEMA(priceValues, 89)
+  const rsi = calculateRSI(priceValues, 14)
+  const obv = calculateOBV(priceValues, volumeValues)
+  const macd = calculateMACD(priceValues, 12, 26, 9)
+  
+  // 获取最新的指标值
+  const latestIndex = priceValues.length - 1
+  const ema89Index = Math.max(0, latestIndex - (priceValues.length - ema89.length))
+  const rsiIndex = Math.max(0, latestIndex - (priceValues.length - rsi.length))
+  const obvIndex = Math.max(0, latestIndex - (priceValues.length - obv.length))
+  const macdIndex = Math.max(0, macd.macd.length - 1)
+  
+  return {
+    ema_89: ema89[ema89Index] || 0,
+    rsi: rsi[rsiIndex] || 50,
+    obv: obv[obvIndex] || 0,
+    macd: macd.macd[macdIndex] || 0,
+    macd_signal: macd.signal[macdIndex] || 0,
+    macd_histogram: macd.histogram[macdIndex] || 0
+  }
+}
+
+// 定时任务：收集数据并计算技术指标
 export async function GET() {
   try {
-    // 检查环境变量
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json(
-        { error: 'Supabase configuration missing' },
-        { status: 500 }
-      )
-    }
-
-    // 获取SOL历史价格数据（最近100天）
-    const response = await axios.get(
-      'https://api.coingecko.com/api/v3/coins/solana/market_chart?vs_currency=usd&days=100&interval=daily'
-    )
+    const supabaseAdmin = getSupabaseAdmin()
     
-    const prices = response.data.prices.map((p: [number, number]) => p[1])
-    const volumes = response.data.total_volumes.map((v: [number, number]) => v[1])
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase 配置缺失' }, { status: 500 })
+    }
+    
+    // 获取最新的价格数据
+    const { data: latestPrice, error: priceError } = await supabaseAdmin
+      .from('latest_price_data')
+      .select('*')
+      .eq('symbol', 'SOL')
+      .single()
+    
+    if (priceError || !latestPrice) {
+      console.warn('没有找到价格数据')
+      return NextResponse.json({ error: '没有找到价格数据' }, { status: 404 })
+    }
+    
+    // 检查是否已经有今天的技术指标数据
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    
+    const { data: existingIndicators } = await supabaseAdmin
+      .from('technical_indicators')
+      .select('id')
+      .eq('symbol', 'SOL')
+      .gte('timestamp', today.toISOString())
+      .limit(1)
+    
+    if (existingIndicators && existingIndicators.length > 0) {
+      console.log('今天的技术指标数据已存在')
+      return NextResponse.json({ message: '技术指标数据已存在' })
+    }
+    
+    // 获取历史价格数据
+    const historicalPrices = await getHistoricalPrices(supabaseAdmin, 'SOL', 100)
+    
+    if (!historicalPrices) {
+      return NextResponse.json({ error: '无法获取历史价格数据' }, { status: 500 })
+    }
     
     // 计算技术指标
-    const ema89 = calculateEMA(prices, 89)
-    const rsi = calculateRSI(prices, 14)
-    const obv = calculateOBV(prices, volumes)
-    const macdData = calculateMACD(prices)
+    const indicators = calculateIndicators(historicalPrices)
     
-    // 获取最新数据
-    const latestPrice = prices[prices.length - 1]
-    const latestVolume = volumes[volumes.length - 1]
-    const latestEma89 = ema89[ema89.length - 1]
-    const latestRsi = rsi[rsi.length - 1]
-    const latestObv = obv[obv.length - 1]
-    const latestMacd = macdData.macd[macdData.macd.length - 1]
-    const latestMacdSignal = macdData.signal[macdData.signal.length - 1]
-    const latestMacdHistogram = macdData.histogram[macdData.histogram.length - 1]
-    
-    const supabaseAdmin = getSupabaseAdmin()
-    if (!supabaseAdmin) {
-      return NextResponse.json(
-        { error: 'Supabase configuration missing' },
-        { status: 500 }
-      )
+    if (!indicators) {
+      return NextResponse.json({ error: '计算技术指标失败' }, { status: 500 })
     }
-
-    // 保存价格数据
-    await supabaseAdmin
-      .from('price_data')
-      .insert({
-        symbol: 'SOL',
-        price: latestPrice,
-        volume_24h: latestVolume,
-        market_cap: latestPrice * 400000000, // 估算市值
-        timestamp: new Date().toISOString()
-      })
     
-    // 保存技术指标数据
-    await supabaseAdmin
+    // 保存技术指标到数据库
+    const { error: insertError } = await supabaseAdmin
       .from('technical_indicators')
       .insert({
         symbol: 'SOL',
-        ema_89: latestEma89,
-        obv: latestObv,
-        rsi: latestRsi,
-        macd: latestMacd,
-        macd_signal: latestMacdSignal,
-        macd_histogram: latestMacdHistogram,
-        timestamp: new Date().toISOString()
+        ema_89: indicators.ema_89,
+        obv: indicators.obv,
+        rsi: indicators.rsi,
+        macd: indicators.macd,
+        macd_signal: indicators.macd_signal,
+        macd_histogram: indicators.macd_histogram
       })
     
+    if (insertError) {
+      console.error('保存技术指标失败:', insertError)
+      return NextResponse.json({ error: '保存技术指标失败' }, { status: 500 })
+    }
+    
+    console.log('技术指标计算完成:', indicators)
+    
     return NextResponse.json({
-      success: true,
-      message: '每日数据抓取完成',
-      timestamp: new Date().toISOString(),
-      data: {
-        price: latestPrice,
-        ema_89: latestEma89,
-        rsi: latestRsi,
-        obv: latestObv,
-        macd: latestMacd
-      }
+      message: '技术指标计算完成',
+      indicators,
+      timestamp: new Date().toISOString()
     })
+    
   } catch (error) {
-    console.error('每日数据抓取失败:', error)
+    console.error('定时任务执行失败:', error)
     return NextResponse.json(
-      { error: '每日数据抓取失败' },
+      { error: '定时任务执行失败' },
       { status: 500 }
     )
   }
