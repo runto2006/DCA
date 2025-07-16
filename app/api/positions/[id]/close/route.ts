@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 
 // 平仓操作
 export async function PUT(
@@ -10,6 +10,14 @@ export async function PUT(
     const body = await request.json()
     const { exit_price } = body
     const positionId = parseInt(params.id)
+
+    const supabaseAdmin = getSupabaseAdmin()
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing' },
+        { status: 500 }
+      )
+    }
 
     // 获取持仓信息
     const { data: position, error: fetchError } = await supabaseAdmin
