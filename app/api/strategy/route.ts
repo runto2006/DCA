@@ -25,8 +25,7 @@ export async function GET() {
       .select('obv')
       .eq('symbol', 'SOL')
       .order('timestamp', { ascending: false })
-      .limit(2)
-      .offset(1)
+      .range(1, 2)
     
     const obvPrev = prevIndicators?.[0]?.obv || indicators.obv
     
