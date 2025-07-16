@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import { calculateEMA, calculateRSI, calculateOBV, calculateMACD } from '@/lib/indicators'
 import axios from 'axios'
 
@@ -38,6 +38,14 @@ export async function GET() {
     const latestMacdSignal = macdData.signal[macdData.signal.length - 1]
     const latestMacdHistogram = macdData.histogram[macdData.histogram.length - 1]
     
+    const supabaseAdmin = getSupabaseAdmin()
+    if (!supabaseAdmin) {
+      return NextResponse.json(
+        { error: 'Supabase configuration missing' },
+        { status: 500 }
+      )
+    }
+
     // 保存价格数据
     await supabaseAdmin
       .from('price_data')

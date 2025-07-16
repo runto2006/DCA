@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { getSupabaseAdmin } from '@/lib/supabase'
 import { calculateStrategyScore } from '@/lib/indicators'
 
 // 获取策略评分
 export async function GET() {
   try {
-    // 检查环境变量
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const supabaseAdmin = getSupabaseAdmin()
+    if (!supabaseAdmin) {
       return NextResponse.json(
         { error: 'Supabase configuration missing' },
         { status: 500 }
