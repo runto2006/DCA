@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: solbtc_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: solbtc_dca
+      POSTGRES_USER: solbtc_user
+      POSTGRES_PASSWORD: runto2015
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./supabase.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - solbtc_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: solbtc_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - solbtc_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  solbtc_network:
+    driver: bridge 

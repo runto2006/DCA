@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
+import { TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react'
+import { formatCurrency, formatNumber, getPriceChangeColor, debounce } from '@/lib/utils'
 
 interface PriceData {
   symbol: string
@@ -17,6 +18,7 @@ export default function PriceDisplay() {
   const [priceData, setPriceData] = useState<PriceData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [priceChange, setPriceChange] = useState<number>(0)
 
   // 获取价格数据
   const fetchPrice = async () => {
@@ -24,6 +26,13 @@ export default function PriceDisplay() {
       setLoading(true)
       const response = await fetch('/api/price')
       const data = await response.json()
+      
+      // 计算价格变化
+      if (priceData) {
+        const change = ((data.price - priceData.price) / priceData.price) * 100
+        setPriceChange(change)
+      }
+      
       setPriceData(data)
       setLastUpdate(new Date())
       setLoading(false)
@@ -33,6 +42,9 @@ export default function PriceDisplay() {
     }
   }
 
+  // 防抖的刷新函数
+  const debouncedFetch = debounce(fetchPrice, 1000)
+
   // 自动刷新价格（每30秒）
   useEffect(() => {
     fetchPrice()
@@ -40,101 +52,99 @@ export default function PriceDisplay() {
     return () => clearInterval(interval)
   }, [])
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount)
-  }
-
-  const formatVolume = (volume: number) => {
-    if (volume >= 1e9) {
-      return `$${(volume / 1e9).toFixed(2)}B`
-    } else if (volume >= 1e6) {
-      return `$${(volume / 1e6).toFixed(2)}M`
-    } else if (volume >= 1e3) {
-      return `$${(volume / 1e3).toFixed(2)}K`
-    }
-    return formatCurrency(volume)
-  }
-
-  const formatMarketCap = (marketCap: number) => {
-    if (marketCap >= 1e12) {
-      return `$${(marketCap / 1e12).toFixed(2)}T`
-    } else if (marketCap >= 1e9) {
-      return `$${(marketCap / 1e9).toFixed(2)}B`
-    } else if (marketCap >= 1e6) {
-      return `$${(marketCap / 1e6).toFixed(2)}M`
-    }
-    return formatCurrency(marketCap)
-  }
-
   if (loading && !priceData) {
     return (
-      <div className="card">
-        <h2 className="text-xl font-semibold mb-4">实时价格</h2>
-        <div className="text-center text-gray-500">加载中...</div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <span className="ml-2 text-sm text-gray-500">加载价格数据...</span>
+        </div>
       </div>
     )
   }
 
   if (!priceData) {
     return (
-      <div className="card">
-        <h2 className="text-xl font-semibold mb-4">实时价格</h2>
-        <div className="text-center text-gray-500">无法获取价格数据</div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div className="flex items-center justify-center text-gray-500">
+          <DollarSign className="w-4 h-4 mr-2" />
+          <span className="text-sm">无法获取价格数据</span>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="card">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">实时价格</h2>
-        <button
-          onClick={fetchPrice}
-          disabled={loading}
-          className="flex items-center text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-          刷新
-        </button>
-      </div>
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+      <div className="flex items-center justify-between">
+        {/* 左侧：价格信息 */}
+        <div className="flex items-center space-x-6">
+          {/* 主要价格 */}
+          <div className="flex items-center space-x-3">
+            <DollarSign className="w-5 h-5 text-blue-600" />
+            <div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {formatCurrency(priceData.price)}
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                {priceData.price_btc.toFixed(8)} BTC
+              </div>
+            </div>
+          </div>
 
-      <div className="space-y-4">
-        {/* 主要价格信息 */}
-        <div className="text-center">
-          <div className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            {formatCurrency(priceData.price)}
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {priceData.price_btc.toFixed(8)} BTC
-          </div>
-          {priceData.isMock && (
-            <div className="text-xs text-yellow-600 mt-1">模拟数据</div>
+          {/* 价格变化指示器 */}
+          {priceChange !== 0 && (
+            <div className={`flex items-center text-sm font-medium ${getPriceChangeColor(priceChange)}`}>
+              {priceChange > 0 ? (
+                <TrendingUp className="w-4 h-4 mr-1" />
+              ) : (
+                <TrendingDown className="w-4 h-4 mr-1" />
+              )}
+              {priceChange > 0 ? '+' : ''}{priceChange.toFixed(2)}%
+            </div>
           )}
         </div>
 
-        {/* 市场数据 */}
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-            <div className="text-gray-600 dark:text-gray-400 mb-1">24h成交量</div>
-            <div className="font-semibold">{formatVolume(priceData.volume_24h)}</div>
+        {/* 中间：市场数据 */}
+        <div className="flex items-center space-x-6 text-sm">
+          <div className="flex items-center space-x-2">
+            <span className="text-gray-600 dark:text-gray-400">24h成交量</span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              ${formatNumber(priceData.volume_24h)}
+            </span>
           </div>
-          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-            <div className="text-gray-600 dark:text-gray-400 mb-1">市值</div>
-            <div className="font-semibold">{formatMarketCap(priceData.market_cap)}</div>
+          
+          <div className="flex items-center space-x-2">
+            <span className="text-gray-600 dark:text-gray-400">市值</span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              ${formatNumber(priceData.market_cap)}
+            </span>
           </div>
         </div>
 
-        {/* 更新时间 */}
-        {lastUpdate && (
-          <div className="text-xs text-gray-500 text-center">
-            最后更新: {lastUpdate.toLocaleString('zh-CN')}
-          </div>
-        )}
+        {/* 右侧：刷新按钮和更新时间 */}
+        <div className="flex items-center space-x-4">
+          {priceData.isMock && (
+            <div className="text-xs text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded-full">
+              模拟数据
+            </div>
+          )}
+          
+          {lastUpdate && (
+            <div className="text-xs text-gray-500">
+              {lastUpdate.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+          
+          <button
+            onClick={debouncedFetch}
+            disabled={loading}
+            className="flex items-center text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-colors p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            title="刷新价格"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
     </div>
   )

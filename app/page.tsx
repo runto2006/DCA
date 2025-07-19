@@ -4,6 +4,9 @@ import PriceDisplay from '@/components/PriceDisplay'
 import StrategyPanel from '@/components/StrategyPanel'
 import PositionManager from '@/components/PositionManager'
 import TradeHistory from '@/components/TradeHistory'
+import TvlDisplay from '@/components/TvlDisplay'
+import DCAAutoTradePanel from '@/components/DCAAutoTradePanel'
+import DCAStrategyDisplay from '@/components/DCAStrategyDisplay'
 
 export default function Home() {
   return (
@@ -19,19 +22,35 @@ export default function Home() {
           </p>
         </div>
 
+        {/* 顶部：价格和TVL信息整合 */}
+        <div className="mb-8">
+          <TvlDisplay />
+        </div>
+
         {/* 主要内容区域 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* 左侧：价格和策略 */}
-          <div className="space-y-6">
-            <PriceDisplay />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* 左侧：策略面板 */}
+          <div className="lg:col-span-2">
             <StrategyPanel />
           </div>
 
           {/* 右侧：持仓管理 */}
-          <div className="space-y-6">
+          <div>
             <PositionManager />
           </div>
         </div>
+
+        {/* DCA网格策略信息 - 全宽显示 */}
+        <div className="mb-8">
+          <DCAStrategyDisplay />
+        </div>
+
+        {/* DCA自动交易面板 */}
+        <div className="mb-8">
+          <DCAAutoTradePanel />
+        </div>
+
+
 
         {/* 底部：交易历史 */}
         <div className="mb-8">
@@ -40,7 +59,7 @@ export default function Home() {
 
         {/* 页脚信息 */}
         <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-          <p>数据来源：CoinGecko API | 技术指标：EMA89, OBV, RSI, MACD</p>
+          <p>数据来源：CoinGecko API, DefiLlama API | 技术指标：EMA89, OBV, RSI, MACD</p>
           <p className="mt-1">⚠️ 本系统仅供学习和研究使用，不构成投资建议</p>
         </div>
       </div>

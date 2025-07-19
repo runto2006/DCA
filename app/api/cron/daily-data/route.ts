@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase'
 import { calculateEMA, calculateRSI, calculateOBV, calculateMACD } from '@/lib/indicators'
+import axios from 'axios'
 
 // 获取历史价格数据用于计算技术指标
 async function getHistoricalPrices(supabase: any, symbol: string, days: number = 100) {

@@ -11,23 +11,34 @@ export async function GET() {
       return NextResponse.json({ error: 'Supabase 配置缺失' }, { status: 500 })
     }
     
-    // 检查是否已有数据
-    const { data: existingData } = await supabaseAdmin
+    // 清空现有数据，强制重新获取
+    console.log('清空现有价格数据...')
+    await supabaseAdmin
       .from('price_data')
-      .select('id')
-      .limit(1)
+      .delete()
+      .neq('id', 0) // 删除所有数据
     
-    if (existingData && existingData.length > 0) {
-      return NextResponse.json({ message: '数据已存在，无需初始化' })
+    // 获取SOL历史价格数据（最近200天，确保有足够数据计算技术指标）
+    console.log('获取SOL历史价格数据...')
+    
+    const headers: any = {
+      'User-Agent': 'SOLBTC-DCA-System/1.0'
     }
     
-    // 获取SOL历史价格数据（最近100天）
+    // 如果有API Key，添加到请求头
+    if (process.env.COINGECKO_API_KEY) {
+      headers['X-CG-API-KEY'] = process.env.COINGECKO_API_KEY
+    }
+    
     const response = await axios.get(
-      'https://api.coingecko.com/api/v3/coins/solana/market_chart?vs_currency=usd&days=100&interval=daily'
+      'https://api.coingecko.com/api/v3/coins/solana/market_chart?vs_currency=usd&days=200&interval=daily',
+      { headers }
     )
     
     const prices = response.data.prices
     const volumes = response.data.total_volumes
+    
+    console.log(`获取到 ${prices.length} 条价格数据`)
     
     // 批量插入历史价格数据
     const priceDataToInsert = prices.map((price: [number, number], index: number) => {
