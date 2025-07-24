@@ -1,6 +1,4 @@
 const { Pool } = require('pg')
-const fs = require('fs')
-const path = require('path')
 
 // 数据库配置
 const dbConfig = {
@@ -10,6 +8,147 @@ const dbConfig = {
   user: process.env.DB_USER || 'solbtc_user',
   password: process.env.DB_PASSWORD || 'runto2015',
 }
+
+// 数据库表结构SQL
+const databaseSchema = `
+-- 用户持仓表
+CREATE TABLE IF NOT EXISTS user_positions (
+  id SERIAL PRIMARY KEY,
+  symbol VARCHAR(20) NOT NULL,
+  position_type VARCHAR(10) NOT NULL CHECK (position_type IN ('LONG', 'SHORT')),
+  entry_price DECIMAL(20,8) NOT NULL,
+  quantity DECIMAL(20,8) NOT NULL,
+  total_amount DECIMAL(20,8) NOT NULL,
+  exit_price DECIMAL(20,8),
+  exit_date TIMESTAMP,
+  pnl DECIMAL(20,8),
+  pnl_percentage DECIMAL(10,4),
+  status VARCHAR(20) DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'CLOSED')),
+  user_id VARCHAR(100) DEFAULT 'default_user',
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  -- 移动止盈相关字段
+  trailing_stop_enabled BOOLEAN DEFAULT FALSE,
+  trailing_stop_distance DECIMAL(5,2),
+  trailing_stop_price DECIMAL(20,8),
+  highest_price DECIMAL(20,8),
+  lowest_price DECIMAL(20,8)
+);
+
+-- 交易历史表
+CREATE TABLE IF NOT EXISTS trade_history (
+  id SERIAL PRIMARY KEY,
+  symbol VARCHAR(20) NOT NULL,
+  trade_type VARCHAR(10) NOT NULL CHECK (trade_type IN ('BUY', 'SELL')),
+  price DECIMAL(20,8) NOT NULL,
+  quantity DECIMAL(20,8) NOT NULL,
+  total_amount DECIMAL(20,8) NOT NULL,
+  strategy_reason VARCHAR(200),
+  user_id VARCHAR(100) DEFAULT 'default_user',
+  timestamp TIMESTAMP DEFAULT NOW()
+);
+
+-- 价格数据表
+CREATE TABLE IF NOT EXISTS price_data (
+  id SERIAL PRIMARY KEY,
+  symbol VARCHAR(20) NOT NULL,
+  price DECIMAL(20,8) NOT NULL,
+  volume DECIMAL(20,8),
+  market_cap DECIMAL(20,8),
+  price_change_24h DECIMAL(10,4),
+  volume_change_24h DECIMAL(10,4),
+  timestamp TIMESTAMP DEFAULT NOW()
+);
+
+-- 技术指标表
+CREATE TABLE IF NOT EXISTS technical_indicators (
+  id SERIAL PRIMARY KEY,
+  symbol VARCHAR(20) NOT NULL,
+  ema_89 DECIMAL(20,8),
+  rsi DECIMAL(10,4),
+  obv DECIMAL(20,8),
+  macd DECIMAL(20,8),
+  macd_signal DECIMAL(20,8),
+  macd_histogram DECIMAL(20,8),
+  timestamp TIMESTAMP DEFAULT NOW()
+);
+
+-- 策略评分表
+CREATE TABLE IF NOT EXISTS strategy_scores (
+  id SERIAL PRIMARY KEY,
+  symbol VARCHAR(20) NOT NULL,
+  ema_score INTEGER CHECK (ema_score >= 0 AND ema_score <= 100),
+  rsi_score INTEGER CHECK (rsi_score >= 0 AND rsi_score <= 100),
+  obv_score INTEGER CHECK (obv_score >= 0 AND obv_score <= 100),
+  macd_score INTEGER CHECK (macd_score >= 0 AND macd_score <= 100),
+  total_score INTEGER CHECK (total_score >= 0 AND total_score <= 100),
+  recommendation VARCHAR(20) CHECK (recommendation IN ('BUY', 'SELL', 'HOLD')),
+  timestamp TIMESTAMP DEFAULT NOW()
+);
+
+-- TVL数据表
+CREATE TABLE IF NOT EXISTS tvl_data (
+  id SERIAL PRIMARY KEY,
+  chain VARCHAR(50) NOT NULL,
+  tvl DECIMAL(20,2) NOT NULL,
+  tvl_change_1d DECIMAL(10,4),
+  tvl_change_7d DECIMAL(10,4),
+  tvl_change_30d DECIMAL(10,4),
+  protocols_count INTEGER,
+  timestamp TIMESTAMP DEFAULT NOW()
+);
+
+-- 多币种配置表
+CREATE TABLE IF NOT EXISTS multi_currency_config (
+  id SERIAL PRIMARY KEY,
+  symbol VARCHAR(20) UNIQUE NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  enabled BOOLEAN DEFAULT TRUE,
+  priority INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 多币种DCA设置表
+CREATE TABLE IF NOT EXISTS multi_currency_dca_settings (
+  id SERIAL PRIMARY KEY,
+  currency_symbol VARCHAR(20) UNIQUE NOT NULL,
+  base_amount DECIMAL(20,8) NOT NULL,
+  max_orders INTEGER DEFAULT 5,
+  price_deviation DECIMAL(5,2) DEFAULT 2.0,
+  take_profit DECIMAL(5,2) DEFAULT 1.5,
+  amount_multiplier DECIMAL(5,2) DEFAULT 1.2,
+  deviation_multiplier DECIMAL(5,2) DEFAULT 1.1,
+  enabled BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 系统配置表
+CREATE TABLE IF NOT EXISTS system_config (
+  id SERIAL PRIMARY KEY,
+  key VARCHAR(100) UNIQUE NOT NULL,
+  value TEXT,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_user_positions_symbol ON user_positions(symbol);
+CREATE INDEX IF NOT EXISTS idx_user_positions_status ON user_positions(status);
+CREATE INDEX IF NOT EXISTS idx_user_positions_user_id ON user_positions(user_id);
+CREATE INDEX IF NOT EXISTS idx_trade_history_symbol ON trade_history(symbol);
+CREATE INDEX IF NOT EXISTS idx_trade_history_timestamp ON trade_history(timestamp);
+CREATE INDEX IF NOT EXISTS idx_price_data_symbol ON price_data(symbol);
+CREATE INDEX IF NOT EXISTS idx_price_data_timestamp ON price_data(timestamp);
+CREATE INDEX IF NOT EXISTS idx_technical_indicators_symbol ON technical_indicators(symbol);
+CREATE INDEX IF NOT EXISTS idx_technical_indicators_timestamp ON technical_indicators(timestamp);
+CREATE INDEX IF NOT EXISTS idx_strategy_scores_symbol ON strategy_scores(symbol);
+CREATE INDEX IF NOT EXISTS idx_strategy_scores_timestamp ON strategy_scores(timestamp);
+CREATE INDEX IF NOT EXISTS idx_tvl_data_chain ON tvl_data(chain);
+CREATE INDEX IF NOT EXISTS idx_tvl_data_timestamp ON tvl_data(timestamp);
+`;
 
 async function initDatabase() {
   console.log('🚀 开始初始化本地数据库...')
@@ -24,13 +163,9 @@ async function initDatabase() {
     console.log('✅ 数据库连接成功:', result.rows[0])
     client.release()
     
-    // 读取SQL文件
-    console.log('📖 读取数据库结构文件...')
-    const sqlPath = path.join(__dirname, '..', 'supabase.sql')
-    const sqlContent = fs.readFileSync(sqlPath, 'utf8')
-    
-    // 分割SQL语句
-    const sqlStatements = sqlContent
+    // 执行数据库结构SQL
+    console.log('📖 创建数据库表结构...')
+    const sqlStatements = databaseSchema
       .split(';')
       .map(stmt => stmt.trim())
       .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'))

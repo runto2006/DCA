@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react'
 import { formatCurrency, formatNumber, getPriceChangeColor, debounce } from '@/lib/utils'
+import { useCurrency } from '@/contexts/CurrencyContext'
 
 interface TvlData {
   chain: string
@@ -35,6 +36,7 @@ interface PriceData {
 }
 
 export default function TvlDisplay() {
+  const { currentSymbol } = useCurrency()
   const [tvlData, setTvlData] = useState<TvlData | null>(null)
   const [tvlHistory, setTvlHistory] = useState<TvlHistory | null>(null)
   const [priceData, setPriceData] = useState<PriceData | null>(null)
@@ -47,11 +49,11 @@ export default function TvlDisplay() {
     fetchTvlData()
     fetchTvlHistory()
     fetchPriceData()
-  }, [])
+  }, [currentSymbol]) // 添加currentSymbol依赖
 
   const fetchTvlData = async () => {
     try {
-      const response = await fetch('/api/tvl')
+      const response = await fetch(`/api/tvl?symbol=${currentSymbol}`)
       if (!response.ok) {
         throw new Error('获取TVL数据失败')
       }
@@ -81,13 +83,21 @@ export default function TvlDisplay() {
   // 获取价格数据
   const fetchPriceData = async () => {
     try {
-      const response = await fetch('/api/price')
+      const response = await fetch(`/api/price?symbol=${currentSymbol}`)
       const data = await response.json()
       
-      // 计算价格变化
-      if (priceData) {
+      // 计算价格变化 - 只有当币种相同时才计算
+      if (priceData && priceData.symbol === currentSymbol) {
         const change = ((data.price - priceData.price) / priceData.price) * 100
-        setPriceChange(change)
+        // 限制价格变化范围，避免异常值
+        if (Math.abs(change) < 50) { // 如果变化超过50%，可能是币种切换导致的，不显示
+          setPriceChange(change)
+        } else {
+          setPriceChange(0)
+        }
+      } else {
+        // 币种切换时重置价格变化
+        setPriceChange(0)
       }
       
       setPriceData(data)
@@ -104,7 +114,10 @@ export default function TvlDisplay() {
     fetchPriceData()
   }, 1000)
 
-  const formatTvl = (tvl: number) => {
+  const formatTvl = (tvl: number | null | undefined) => {
+    if (tvl == null || isNaN(tvl)) {
+      return '$0.00'
+    }
     if (tvl >= 1e9) {
       return `$${(tvl / 1e9).toFixed(2)}B`
     } else if (tvl >= 1e6) {
@@ -115,7 +128,14 @@ export default function TvlDisplay() {
     return `$${tvl.toFixed(2)}`
   }
 
-  const formatChange = (change: number) => {
+  const formatChange = (change: number | null | undefined) => {
+    if (change == null || isNaN(change)) {
+      return (
+        <span className="font-medium text-gray-600">
+          0.00%
+        </span>
+      )
+    }
     const isPositive = change >= 0
     return (
       <span className={`font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
@@ -135,7 +155,7 @@ export default function TvlDisplay() {
 
     return {
       title: {
-        text: 'Solana TVL 30天趋势',
+        text: `${tvlData?.chain || '生态'} TVL 30天趋势`,
         left: 'center',
         textStyle: {
           fontSize: 16,
@@ -146,7 +166,8 @@ export default function TvlDisplay() {
         trigger: 'axis',
         formatter: function(params: any) {
           const data = params[0]
-          return `${data.name}<br/>TVL: $${data.value.toFixed(2)}B`
+          const value = data.value || 0
+          return `${data.name}<br/>TVL: $${value.toFixed(2)}B`
         }
       },
       xAxis: {
@@ -243,7 +264,7 @@ export default function TvlDisplay() {
         <div>
           <h2 className="text-xl font-bold text-gray-900">市场数据</h2>
           <p className="text-sm text-gray-500 mt-1">
-            实时价格 + Solana生态TVL
+            实时价格 + {tvlData?.chain || '生态'} TVL
           </p>
         </div>
         <button
@@ -267,7 +288,7 @@ export default function TvlDisplay() {
                   {formatCurrency(priceData.price)}
                 </div>
                 <div className="text-xs text-gray-600">
-                  {priceData.price_btc.toFixed(8)} BTC
+                  {priceData.price_btc ? priceData.price_btc.toFixed(8) : '0.00000000'} BTC
                 </div>
               </div>
             </div>
@@ -280,7 +301,7 @@ export default function TvlDisplay() {
                 ) : (
                   <TrendingDown className="w-4 h-4 mr-1" />
                 )}
-                {priceChange > 0 ? '+' : ''}{priceChange.toFixed(2)}%
+                {priceChange > 0 ? '+' : ''}{(priceChange || 0).toFixed(2)}%
               </div>
             )}
 

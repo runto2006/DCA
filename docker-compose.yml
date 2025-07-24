@@ -14,7 +14,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./supabase.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/init-database.js:/docker-entrypoint-initdb.d/init.sql
     networks:
       - solbtc_network
 

@@ -237,11 +237,11 @@ export default function DCAStrategyDisplay() {
         <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 mb-6 p-4 bg-white bg-opacity-50 rounded-lg">
           <div>
             <div className="text-sm text-gray-600 mb-1">价格偏差</div>
-            <div className="text-lg font-semibold text-blue-600">{strategyData.dcaStrategy.priceDeviation}%</div>
+            <div className="text-lg font-semibold text-blue-600">{strategyData.dcaStrategy.priceDeviation.toFixed(2)}%</div>
           </div>
           <div>
             <div className="text-sm text-gray-600 mb-1">止盈比例</div>
-            <div className="text-lg font-semibold text-green-600">{strategyData.dcaStrategy.takeProfit}%</div>
+            <div className="text-lg font-semibold text-green-600">{strategyData.dcaStrategy.takeProfit.toFixed(2)}%</div>
           </div>
           <div>
             <div className="text-sm text-gray-600 mb-1">整体止损</div>

@@ -31,7 +31,7 @@ $includeItems = @(
     "postcss.config.js",
     "tsconfig.json",
     "env.local.example",
-    "supabase.sql",
+    "scripts/init-database.js",
     "UBUNTU_DEPLOYMENT.md",
     "Ubuntu部署完成报告.md",
     "移动止盈详细解释.md",

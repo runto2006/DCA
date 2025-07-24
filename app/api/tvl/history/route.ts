@@ -1,39 +1,40 @@
-import { NextResponse } from 'next/server'
-import axios from 'axios'
+import { NextRequest, NextResponse } from 'next/server'
 
-// 获取Solana TVL历史数据（近30天）
-async function getSolanaTvlHistory() {
+export async function GET(req: NextRequest) {
   try {
-    // DefiLlama历史TVL接口
-    const url = 'https://api.llama.fi/v2/historicalChainTvl/solana'
-    const response = await axios.get(url, {
-      timeout: 10000,
-      headers: { 'User-Agent': 'SOLBTC-DCA-System/1.0' }
-    })
-    const data = response.data
-    // 只取最近30天
-    const last30 = data.slice(-30).map((item: any) => ({
-      date: item.date,
-      tvl: item.tvl
-    }))
-    return last30
-  } catch (error) {
-    console.error('获取Solana TVL历史数据失败:', error)
-    // 返回模拟数据
+    const { searchParams } = new URL(req.url)
+    const symbol = searchParams.get('symbol') || 'BTC'
+    const days = parseInt(searchParams.get('days') || '30')
+    
+    // 生成模拟历史数据
+    const history = []
+    const baseTvl = Math.random() * 1000000000 + 500000000
     const now = Date.now()
-    const oneDay = 24 * 60 * 60 * 1000
-    const base = 1500000000
-    return Array.from({ length: 30 }, (_, i) => ({
-      date: Math.floor((now - (29 - i) * oneDay) / 1000),
-      tvl: base + Math.floor(Math.sin(i / 5) * 50000000 + Math.random() * 20000000)
-    }))
+    
+    for (let i = days; i >= 0; i--) {
+      const date = now - (i * 24 * 60 * 60 * 1000)
+      const volatility = 0.1 // 10%的波动
+      const randomChange = (Math.random() - 0.5) * volatility
+      const tvl = baseTvl * (1 + randomChange)
+      
+      history.push({
+        date,
+        tvl: Math.max(tvl, 100000000) // 最小1亿
+      })
+    }
+    
+    const mockHistoryData = {
+      chain: symbol,
+      history,
+      isMock: true
+    }
+    
+    return NextResponse.json(mockHistoryData)
+  } catch (error) {
+    console.error('❌ 获取TVL历史数据失败:', error)
+    return NextResponse.json(
+      { error: '获取TVL历史数据失败' },
+      { status: 500 }
+    )
   }
-}
-
-export async function GET() {
-  const history = await getSolanaTvlHistory()
-  return NextResponse.json({
-    chain: 'Solana',
-    history
-  })
 } 

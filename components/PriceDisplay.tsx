@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, RefreshCw, DollarSign } from 'lucide-react'
 import { formatCurrency, formatNumber, getPriceChangeColor, debounce } from '@/lib/utils'
+import { useCurrency } from '@/contexts/CurrencyContext'
 
 interface PriceData {
   symbol: string
@@ -15,6 +16,7 @@ interface PriceData {
 }
 
 export default function PriceDisplay() {
+  const { currentSymbol } = useCurrency()
   const [priceData, setPriceData] = useState<PriceData | null>(null)
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
@@ -24,13 +26,21 @@ export default function PriceDisplay() {
   const fetchPrice = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/price')
+      const response = await fetch(`/api/price?symbol=${currentSymbol}`)
       const data = await response.json()
       
-      // 计算价格变化
-      if (priceData) {
+      // 计算价格变化 - 只有当币种相同时才计算
+      if (priceData && priceData.symbol === currentSymbol) {
         const change = ((data.price - priceData.price) / priceData.price) * 100
-        setPriceChange(change)
+        // 限制价格变化范围，避免异常值
+        if (Math.abs(change) < 50) { // 如果变化超过50%，可能是币种切换导致的，不显示
+          setPriceChange(change)
+        } else {
+          setPriceChange(0)
+        }
+      } else {
+        // 币种切换时重置价格变化
+        setPriceChange(0)
       }
       
       setPriceData(data)
@@ -50,7 +60,7 @@ export default function PriceDisplay() {
     fetchPrice()
     const interval = setInterval(fetchPrice, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [currentSymbol]) // 添加currentSymbol依赖
 
   if (loading && !priceData) {
     return (

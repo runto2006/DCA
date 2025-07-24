@@ -1,5 +1,8 @@
 // 格式化数字为货币
-export function formatCurrency(amount: number, currency = 'USD') {
+export function formatCurrency(amount: number | null | undefined, currency = 'USD') {
+  if (amount == null || isNaN(amount)) {
+    return '$0.00'
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -9,7 +12,10 @@ export function formatCurrency(amount: number, currency = 'USD') {
 }
 
 // 格式化大数字
-export function formatNumber(num: number): string {
+export function formatNumber(num: number | null | undefined): string {
+  if (num == null || isNaN(num)) {
+    return '0.00'
+  }
   if (num >= 1e12) {
     return `${(num / 1e12).toFixed(2)}T`
   } else if (num >= 1e9) {
@@ -23,12 +29,18 @@ export function formatNumber(num: number): string {
 }
 
 // 格式化百分比
-export function formatPercentage(value: number, decimals = 2): string {
+export function formatPercentage(value: number | null | undefined, decimals = 2): string {
+  if (value == null || isNaN(value)) {
+    return `0.${'0'.repeat(decimals)}%`
+  }
   return `${value.toFixed(decimals)}%`
 }
 
 // 获取价格变化颜色
-export function getPriceChangeColor(change: number): string {
+export function getPriceChangeColor(change: number | null | undefined): string {
+  if (change == null || isNaN(change)) {
+    return 'text-gray-600 dark:text-gray-400'
+  }
   if (change > 0) return 'text-green-600 dark:text-green-400'
   if (change < 0) return 'text-red-600 dark:text-red-400'
   return 'text-gray-600 dark:text-gray-400'

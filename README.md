@@ -1,159 +1,139 @@
-# SOLBTC DCA 轮动模型追踪系统
+# SOLBTC-DCA加仓系统
 
-一个基于 Next.js + Supabase 的 SOL/USDT 不止损轮动模型实时追踪与策略评分系统。
+一个基于 Next.js + 本地PostgreSQL数据库 的智能DCA（定投）交易系统，支持多币种、移动止盈和实时价格监控。
 
 ## 🚀 功能特性
 
-### 核心功能
-- **实时价格监控**: 实时显示 SOL/USDT 和 SOL/BTC 价格
-- **技术指标分析**: EMA89、OBV、RSI、MACD 四大指标实时计算
-- **策略评分系统**: 基于多指标的综合评分和建议
-- **持仓管理**: 支持手动创建和管理交易持仓
-- **交易历史**: 完整的交易记录和统计
-- **自动数据抓取**: 每日自动更新价格和技术指标数据
-
-### 技术指标
-- **EMA89**: 89周期指数移动平均线
-- **OBV**: 能量潮指标
-- **RSI**: 相对强弱指数
-- **MACD**: 移动平均收敛散度
+- 📊 **实时价格监控**: 支持多币种实时价格显示
+- 💰 **DCA自动交易**: 智能定投策略，自动执行交易
+- 📈 **多币种支持**: BTC、ETH、SOL等多种主流币种
+- 🎯 **移动止盈**: 智能移动止盈功能，最大化收益
+- 📱 **响应式界面**: 现代化UI设计，支持移动端
+- 🔒 **安全集成**: 安全的Binance API集成
 
 ## 🛠️ 技术栈
 
 - **前端**: Next.js 14, React 18, TypeScript
 - **样式**: TailwindCSS
-- **后端**: Supabase (PostgreSQL + Edge Functions)
+- **后端**: 本地PostgreSQL数据库
+- **交易**: Binance API
 - **部署**: Vercel
-- **数据源**: CoinGecko API
 
-## 📦 安装部署
+## 🚀 快速开始
 
-### 1. 环境准备
+### Windows用户
 
-确保你已经完成以下步骤：
-- ✅ 登录 GitHub
-- ✅ 登录 Vercel
-- ✅ 登录 Supabase 控制台
-- ✅ 创建 Supabase 项目
+1. **一键启动** (推荐)
+   ```bash
+   # 双击运行 start.bat 文件
+   # 或在命令行中执行：
+   start.bat
+   ```
 
-### 2. 克隆项目
+2. **手动安装**
+   - 安装 [Node.js](https://nodejs.org/) (18.0+)
+   - 安装 [Git](https://git-scm.com/)
+   - 克隆项目并安装依赖
+   - 配置环境变量
+   - 启动服务器
+
+详细安装步骤请查看 [Windows安装教程.md](./Windows安装教程.md)
+
+### 环境配置
+
+1. 复制环境变量模板：
+   ```bash
+   copy env.example env.local
+   ```
+
+2. 编辑 `env.local` 文件：
+   ```env
+   # 本地PostgreSQL数据库配置
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=solbtc_dca
+   DB_USER=solbtc_user
+   DB_PASSWORD=runto2015
+
+   # Binance API配置
+   BINANCE_API_KEY=your_binance_api_key
+   BINANCE_SECRET_KEY=your_binance_secret_key
+
+   # 其他配置
+   NEXTAUTH_SECRET=your_nextauth_secret
+   NEXTAUTH_URL=http://localhost:3000
+   ```
+
+### 启动应用
 
 ```bash
-git clone <your-repo-url>
-cd SOLBTC-dca-trading-system
-```
-
-### 3. 安装依赖
-
-```bash
-npm install
-```
-
-### 4. 环境配置
-
-复制环境变量文件：
-```bash
-cp env.example .env.local
-```
-
-编辑 `.env.local` 文件，填入你的 Supabase 配置：
-```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-```
-
-### 5. 数据库初始化
-
-在 Supabase 控制台的 SQL 编辑器中执行 `supabase.sql` 文件中的所有 SQL 语句。
-
-### 6. 本地开发
-
-```bash
+# 开发模式
 npm run dev
+
+# 生产构建
+npm run build
+npm start
 ```
 
-访问 http://localhost:3000 查看应用。
+访问 http://localhost:3000 查看应用
 
-### 7. 部署到 Vercel
+## 📊 主要功能
 
-1. 将代码推送到 GitHub
-2. 在 Vercel 中导入项目
-3. 配置环境变量
-4. 部署完成
+### 1. 价格监控
+- 实时显示多币种价格
+- 价格变化趋势图表
+- 24小时涨跌幅统计
 
-## 📊 数据库结构
+### 2. DCA策略
+- 智能定投策略配置
+- 自动执行交易
+- 策略效果分析
 
-### 主要数据表
-- `price_data`: 价格数据
-- `technical_indicators`: 技术指标数据
-- `strategy_scores`: 策略评分数据
-- `user_positions`: 用户持仓
-- `trade_history`: 交易历史
-- `system_config`: 系统配置
+### 3. 持仓管理
+- 创建和管理交易持仓
+- 移动止盈设置
+- 持仓盈亏统计
 
-## 🔧 API 接口
+### 4. 交易历史
+- 完整的交易记录
+- 交易统计分析
+- 收益曲线图表
 
-### 价格数据
-- `GET /api/price` - 获取实时价格
+## 🔧 项目结构
 
-### 策略评分
-- `GET /api/strategy` - 获取策略评分
+```
+SOLBTC-DCA加仓/
+├── app/                    # Next.js应用主目录
+│   ├── api/               # API路由
+│   ├── globals.css        # 全局样式
+│   ├── layout.tsx         # 布局组件
+│   └── page.tsx           # 主页面
+├── components/            # React组件
+│   ├── ui/               # UI组件库
+│   └── *.tsx             # 功能组件
+├── lib/                   # 工具库
+├── scripts/              # 脚本文件
+├── start.bat             # Windows快速启动脚本
+├── build-direct.bat      # 构建脚本
+└── README.md             # 项目说明
+```
 
-### 持仓管理
-- `GET /api/positions` - 获取持仓列表
-- `POST /api/positions` - 创建新持仓
-- `PUT /api/positions/[id]/close` - 平仓操作
-
-### 交易历史
-- `GET /api/trades` - 获取交易历史
-
-### 定时任务
-- `GET /api/cron/daily-data` - 每日数据抓取
-
-## 🎯 使用指南
-
-### 1. 查看实时数据
-- 打开应用首页，查看 SOL 实时价格和策略评分
-- 数据每30秒自动刷新
-
-### 2. 管理持仓
-- 点击"新建持仓"按钮创建新持仓
-- 选择持仓类型（做多/做空）
-- 输入入场价格和数量
-- 点击"平仓"按钮关闭持仓
-
-### 3. 查看交易历史
-- 在交易历史面板查看所有交易记录
-- 包含交易统计信息
-
-### 4. 策略评分解读
-- **总评分 70+**: 建议买入
-- **总评分 30-**: 建议卖出
-- **总评分 30-70**: 建议持有
-
-## 🔄 自动数据更新
-
-系统配置了每日自动数据抓取任务：
-- 每天凌晨自动获取 SOL 价格数据
-- 计算并更新技术指标
-- 更新策略评分
-
-## 🚨 注意事项
+## 🚨 重要提醒
 
 1. **风险提示**: 本系统仅供学习和研究使用，不构成投资建议
-2. **数据延迟**: 价格数据可能有轻微延迟
-3. **策略评分**: 评分仅供参考，实际交易请谨慎决策
-4. **数据存储**: 所有数据存储在 Supabase 中，请妥善保管账户信息
+2. **API安全**: 请妥善保管您的Binance API密钥
+3. **资金安全**: 建议先使用小额资金测试
+4. **数据备份**: 定期备份重要数据
 
-## 🤝 贡献
+## 📞 技术支持
 
-欢迎提交 Issue 和 Pull Request 来改进项目。
+如遇到问题，请检查：
+1. Node.js版本是否符合要求
+2. PostgreSQL是否正确安装和配置
+3. 环境变量配置是否正确
+4. 数据库连接是否正常
+5. API密钥是否有效
 
-## 📄 许可证
+## �� 许可证
 
-MIT License
-
-## 📞 支持
-
-如有问题，请通过 GitHub Issues 联系。 
+MIT License 

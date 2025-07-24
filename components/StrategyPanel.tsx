@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Minus, BarChart3, Brain, Activity, RefreshCw, AlertTriangle, Info, Settings, Save, DollarSign, Percent, Layers, Target, Shield } from 'lucide-react'
+import { useCurrency } from '@/contexts/CurrencyContext'
 
 interface DCAStrategyConfig {
   type: 'CONSERVATIVE' | 'BALANCED' | 'AGGRESSIVE';
@@ -77,6 +78,7 @@ interface StrategyData {
 }
 
 export default function StrategyPanel() {
+  const { currentSymbol } = useCurrency()
   const [strategyData, setStrategyData] = useState<StrategyData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showDetails, setShowDetails] = useState(false)
@@ -156,8 +158,8 @@ export default function StrategyPanel() {
       setLoading(true)
       
       // 构建请求URL，包含所有参数
-      let url = '/api/strategy'
       const params = new URLSearchParams()
+      params.append('symbol', currentSymbol)
       
       // 添加支撑阻力位参数
       if (customSupportResistance) {
@@ -171,9 +173,7 @@ export default function StrategyPanel() {
         params.append('historicalLow', customHistoricalPrices.low.toString())
       }
       
-      if (params.toString()) {
-        url += `?${params.toString()}`
-      }
+      const url = `/api/strategy?${params.toString()}`
       
       const response = await fetch(url)
       const data = await response.json()
@@ -182,6 +182,8 @@ export default function StrategyPanel() {
       console.log('获取到的策略数据:', data)
       console.log('DCA策略:', data.dcaStrategy)
       console.log('价格位置:', data.pricePosition)
+      console.log('风险因素:', data.riskFactors)
+      console.log('是否为模拟数据:', data.isMock)
       
       setStrategyData(data)
       
@@ -251,7 +253,7 @@ export default function StrategyPanel() {
     fetchStrategy()
     const interval = setInterval(fetchStrategy, 60000)
     return () => clearInterval(interval)
-  }, [])
+  }, [currentSymbol]) // 添加currentSymbol依赖
 
   if (loading && !strategyData) {
     return (
@@ -682,7 +684,7 @@ export default function StrategyPanel() {
                 </span>
                 {strategyData.indicators?.ema89 && (
                   <div className="text-xs text-gray-500">
-                    ${strategyData.indicators.ema89.value.toFixed(2)}
+                    ${(strategyData.indicators.ema89.value || 0).toFixed(2)}
                   </div>
                 )}
               </div>
@@ -748,7 +750,7 @@ export default function StrategyPanel() {
                 </span>
                 {strategyData.indicators?.rsi && (
                   <div className="text-xs text-gray-500">
-                    {strategyData.indicators.rsi.value.toFixed(2)}
+                    {(strategyData.indicators.rsi.value || 0).toFixed(2)}
                   </div>
                 )}
               </div>
@@ -781,7 +783,7 @@ export default function StrategyPanel() {
                 </span>
                 {strategyData.indicators?.macd && (
                   <div className="text-xs text-gray-500">
-                    {strategyData.indicators.macd.value.toFixed(4)} / {strategyData.indicators.macd.signal.toFixed(4)}
+                    {(strategyData.indicators.macd.value || 0).toFixed(4)} / {(strategyData.indicators.macd.signal || 0).toFixed(4)}
                   </div>
                 )}
               </div>

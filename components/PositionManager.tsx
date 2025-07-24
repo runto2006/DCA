@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Minus, DollarSign, TrendingUp, TrendingDown, BarChart3, Target, AlertTriangle, Info } from 'lucide-react'
+import { useCurrency } from '@/contexts/CurrencyContext'
 
 interface Position {
   id: number
@@ -63,13 +64,13 @@ interface BinanceAccountData {
     updateTime: number
   }
   balances: {
-    SOL: BinanceBalance
-    BTC: BinanceBalance
+    [key: string]: BinanceBalance
   }
   totalValue: number
 }
 
 export default function PositionManager() {
+  const { currentSymbol } = useCurrency()
   const [positions, setPositions] = useState<Position[]>([])
   const [stats, setStats] = useState<PositionStats | null>(null)
   const [binanceData, setBinanceData] = useState<BinanceAccountData | null>(null)
@@ -111,15 +112,15 @@ export default function PositionManager() {
   // 获取持仓数据
   const fetchPositions = async () => {
     try {
-      const response = await fetch('/api/positions')
-      const data = await response.json()
+      const response = await fetch(`/api/positions?symbol=${currentSymbol}`)
+      const result = await response.json()
       
-      if (data.positions && data.stats) {
-        setPositions(Array.isArray(data.positions) ? data.positions : [])
-        setStats(data.stats)
+      // 正确处理API返回的数据结构
+      if (result.success && result.data) {
+        setPositions(Array.isArray(result.data) ? result.data : [])
+        setStats(null) // 暂时不处理统计信息
       } else {
-        // 兼容旧格式
-        setPositions(Array.isArray(data) ? data : [])
+        setPositions([])
         setStats(null)
       }
     } catch (error) {
@@ -132,14 +133,20 @@ export default function PositionManager() {
   // 获取币安账户数据
   const fetchBinanceData = async () => {
     try {
-      const response = await fetch('/api/binance/balance')
+      const response = await fetch(`/api/binance/balance?symbol=${currentSymbol}`)
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || '获取币安数据失败')
       }
-      const data = await response.json()
-      setBinanceData(data)
-      setError(null)
+      const result = await response.json()
+      
+      // 正确处理API返回的数据结构
+      if (result.success && result.data) {
+        setBinanceData(result.data)
+        setError(null)
+      } else {
+        throw new Error('获取币安数据失败')
+      }
     } catch (error) {
       console.error('获取币安数据失败:', error)
       setError(error instanceof Error ? error.message : '未知错误')
@@ -150,10 +157,16 @@ export default function PositionManager() {
   // 获取当前价格
   const fetchCurrentPrice = async () => {
     try {
-      const response = await fetch('/api/price')
+      const response = await fetch(`/api/price?symbol=${currentSymbol}`)
       if (response.ok) {
-        const data = await response.json()
-        setCurrentPrice(data.price)
+        const result = await response.json()
+        // 正确处理API返回的数据结构
+        if (result.success && result.data) {
+          setCurrentPrice(result.data.price)
+        } else if (result.price) {
+          // 兼容直接返回价格的情况
+          setCurrentPrice(result.price)
+        }
       }
     } catch (error) {
       console.error('获取当前价格失败:', error)
@@ -242,7 +255,7 @@ export default function PositionManager() {
       clearInterval(interval)
       clearInterval(balanceInterval)
     }
-  }, [])
+  }, [currentSymbol]) // 添加currentSymbol依赖
 
   // 提交新持仓
   const handleSubmit = async (e: React.FormEvent) => {
@@ -255,7 +268,7 @@ export default function PositionManager() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          symbol: 'SOL',
+          symbol: currentSymbol,
           position_type: formData.position_type,
           entry_price: parseFloat(formData.entry_price),
           quantity: parseFloat(formData.quantity),
@@ -332,6 +345,55 @@ export default function PositionManager() {
         return 'text-gray-600 bg-gray-100'
       default:
         return 'text-yellow-600 bg-yellow-100'
+    }
+  }
+
+  // 辅助函数：安全地获取数字值
+  const getNumberValue = (value: any, defaultValue: number = 0): number => {
+    if (typeof value === 'number') return value
+    if (typeof value === 'string') return parseFloat(value) || defaultValue
+    return defaultValue
+  }
+
+  // 辅助函数：安全地格式化日期
+  const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return '限价订单待成交'
+    
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) {
+        return '限价订单待成交'
+      }
+      return date.toLocaleString('zh-CN')
+    } catch (error) {
+      return '限价订单待成交'
+    }
+  }
+
+  // 取消限价订单
+  const handleCancelOrder = async (positionId: number) => {
+    if (!confirm('确定要取消这个限价订单吗？此操作不可撤销。')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/positions/${positionId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        alert('限价订单已成功取消')
+        fetchPositions()
+      } else {
+        const errorData = await response.json()
+        alert(`取消订单失败: ${errorData.error || '请重试'}`)
+      }
+    } catch (error) {
+      console.error('取消订单错误:', error)
+      alert('取消订单时发生错误')
     }
   }
 
@@ -448,51 +510,84 @@ export default function PositionManager() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white bg-opacity-20 rounded-lg p-3">
-              <div className="mb-2">
-                <div className="text-sm opacity-90">SOL</div>
-                <div className="text-lg font-bold">{binanceData.balances.SOL.total.toFixed(6)}</div>
-                <div className="text-sm opacity-90">${binanceData.balances.SOL.price.toFixed(2)}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <div className="opacity-75">总价值</div>
-                  <div className="font-semibold">{formatCurrency(binanceData.balances.SOL.value)}</div>
-                </div>
-                <div>
-                  <div className="opacity-75">可用余额</div>
-                  <div className="font-semibold">{binanceData.balances.SOL.free.toFixed(6)}</div>
-                </div>
-              </div>
-              {binanceData.balances.SOL.locked > 0 && (
-                <div className="mt-1 text-xs opacity-75">
-                  冻结: {binanceData.balances.SOL.locked.toFixed(6)}
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-white bg-opacity-20 rounded-lg p-3">
-              <div className="mb-2">
-                <div className="text-sm opacity-90">BTC</div>
-                <div className="text-lg font-bold">{binanceData.balances.BTC.total.toFixed(8)}</div>
-                <div className="text-sm opacity-90">${binanceData.balances.BTC.price.toFixed(2)}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <div className="opacity-75">总价值</div>
-                  <div className="font-semibold">{formatCurrency(binanceData.balances.BTC.value)}</div>
-                </div>
-                <div>
-                  <div className="opacity-75">可用余额</div>
-                  <div className="font-semibold">{binanceData.balances.BTC.free.toFixed(8)}</div>
-                </div>
-              </div>
-              {binanceData.balances.BTC.locked > 0 && (
-                <div className="mt-1 text-xs opacity-75">
-                  冻结: {binanceData.balances.BTC.locked.toFixed(8)}
-                </div>
-              )}
-            </div>
+            {/* 当前币种余额 */}
+            {(() => {
+              const symbolAsset = currentSymbol.replace('USDT', '')
+              
+              // 添加安全检查
+              if (!binanceData || !binanceData.balances) {
+                return (
+                  <div className="col-span-2 text-center text-gray-500">
+                    余额数据加载中...
+                  </div>
+                )
+              }
+              
+              const currentBalance = binanceData.balances[symbolAsset]
+              const btcBalance = binanceData.balances['BTC']
+              
+              if (!currentBalance || !btcBalance) {
+                return (
+                  <div className="col-span-2 text-center text-gray-500">
+                    余额数据加载中...
+                  </div>
+                )
+              }
+              
+              return (
+                <>
+                  <div className="bg-white bg-opacity-20 rounded-lg p-3">
+                    <div className="mb-2">
+                      <div className="text-sm opacity-90">{symbolAsset}</div>
+                      <div className="text-lg font-bold">
+                        {currentBalance.total.toFixed(symbolAsset === 'BTC' ? 8 : 6)}
+                      </div>
+                      <div className="text-sm opacity-90">${(currentBalance.price || 0).toFixed(2)}</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <div className="opacity-75">总价值</div>
+                        <div className="font-semibold">{formatCurrency(currentBalance.value)}</div>
+                      </div>
+                      <div>
+                        <div className="opacity-75">可用余额</div>
+                        <div className="font-semibold">
+                          {currentBalance.free.toFixed(symbolAsset === 'BTC' ? 8 : 6)}
+                        </div>
+                      </div>
+                    </div>
+                    {currentBalance.locked > 0 && (
+                      <div className="mt-1 text-xs opacity-75">
+                        冻结: {currentBalance.locked.toFixed(symbolAsset === 'BTC' ? 8 : 6)}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="bg-white bg-opacity-20 rounded-lg p-3">
+                    <div className="mb-2">
+                      <div className="text-sm opacity-90">BTC</div>
+                      <div className="text-lg font-bold">{btcBalance.total.toFixed(8)}</div>
+                      <div className="text-sm opacity-90">${(btcBalance.price || 0).toFixed(2)}</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <div className="opacity-75">总价值</div>
+                        <div className="font-semibold">{formatCurrency(btcBalance.value)}</div>
+                      </div>
+                      <div>
+                        <div className="opacity-75">可用余额</div>
+                        <div className="font-semibold">{btcBalance.free.toFixed(8)}</div>
+                      </div>
+                    </div>
+                    {btcBalance.locked > 0 && (
+                      <div className="mt-1 text-xs opacity-75">
+                        冻结: {btcBalance.locked.toFixed(8)}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </div>
       )}
@@ -646,12 +741,16 @@ export default function PositionManager() {
                     </span>
                   </div>
                   <div className="text-sm text-gray-600 mt-1">
-                    入场时间: {new Date(position.entry_date).toLocaleString('zh-CN')}
+                    入场时间: {formatDate(position.entry_date)}
+                    {position.status === 'CLOSED' && position.exit_date && (
+                      <span className="ml-4">平仓时间: {formatDate(position.exit_date)}</span>
+                    )}
                   </div>
                 </div>
                 
                 {position.status === 'ACTIVE' && (
                   <div className="flex space-x-2">
+                    {/* 移动止盈按钮 - 所有活跃持仓都显示 */}
                     <button
                       onClick={() => openTrailingStopModal(position)}
                       className={`px-3 py-1 text-sm rounded transition-colors ${
@@ -662,17 +761,31 @@ export default function PositionManager() {
                     >
                       {position.trailing_stop_enabled ? '移动止盈' : '设置移动止盈'}
                     </button>
-                    <button
-                      onClick={() => {
-                        const exitPrice = prompt('请输入平仓价格:')
-                        if (exitPrice && !isNaN(parseFloat(exitPrice))) {
-                          handleClosePosition(position.id, parseFloat(exitPrice))
-                        }
-                      }}
-                      className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                    >
-                      平仓
-                    </button>
+                    
+                    {/* 限价订单待成交时显示取消按钮 */}
+                    {!position.entry_date && (
+                      <button
+                        onClick={() => handleCancelOrder(position.id)}
+                        className="px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
+                      >
+                        取消订单
+                      </button>
+                    )}
+                    
+                    {/* 已成交的持仓显示平仓按钮 */}
+                    {position.entry_date && (
+                      <button
+                        onClick={() => {
+                          const exitPrice = prompt('请输入平仓价格:')
+                          if (exitPrice && !isNaN(parseFloat(exitPrice))) {
+                            handleClosePosition(position.id, parseFloat(exitPrice))
+                          }
+                        }}
+                        className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                      >
+                        平仓
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -684,23 +797,56 @@ export default function PositionManager() {
                 </div>
                 <div>
                   <div className="text-gray-600">数量</div>
-                  <div className="font-semibold">{position.quantity.toFixed(6)}</div>
+                  <div className="font-semibold">{getNumberValue(position.quantity).toFixed(6)}</div>
                 </div>
-                <div>
-                  <div className="text-gray-600">持仓价值</div>
-                  <div className="font-semibold">
-                    {currentPrice ? formatCurrency(currentPrice * position.quantity) : formatCurrency(position.total_amount)}
-                </div>
-                </div>
-                  <div>
-                    <div className="text-gray-600">盈亏</div>
-                  <div className={`font-semibold ${getPnlColor(currentPrice ? (currentPrice - position.entry_price) * position.quantity : (position.pnl || 0))}`}>
-                    {currentPrice ? formatCurrency((currentPrice - position.entry_price) * position.quantity) : formatCurrency(position.pnl || 0)}
-                    {currentPrice && (
-                      <span className="ml-1">({((currentPrice - position.entry_price) / position.entry_price * 100).toFixed(2)}%)</span>
-                      )}
+                {!position.entry_date ? (
+                  // 待成交限价订单显示价差信息
+                  <>
+                    <div>
+                      <div className="text-gray-600">当前价差</div>
+                      <div className="font-semibold">
+                        {currentPrice ? (
+                          <span className={currentPrice >= getNumberValue(position.entry_price) ? 'text-green-600' : 'text-red-600'}>
+                            {formatCurrency(Math.abs(currentPrice - getNumberValue(position.entry_price)))}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">--</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                    <div>
+                      <div className="text-gray-600">价差百分比</div>
+                      <div className="font-semibold">
+                        {currentPrice ? (
+                          <span className={currentPrice >= getNumberValue(position.entry_price) ? 'text-green-600' : 'text-red-600'}>
+                            {((Math.abs(currentPrice - getNumberValue(position.entry_price)) / getNumberValue(position.entry_price)) * 100).toFixed(2)}%
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">--</span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // 已成交持仓显示持仓价值和盈亏
+                  <>
+                    <div>
+                      <div className="text-gray-600">持仓价值</div>
+                      <div className="font-semibold">
+                        {currentPrice ? formatCurrency(currentPrice * getNumberValue(position.quantity)) : formatCurrency(position.total_amount)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600">盈亏</div>
+                      <div className={`font-semibold ${getPnlColor(currentPrice ? (currentPrice - getNumberValue(position.entry_price)) * getNumberValue(position.quantity) : (position.pnl || 0))}`}>
+                        {currentPrice ? formatCurrency((currentPrice - getNumberValue(position.entry_price)) * getNumberValue(position.quantity)) : formatCurrency(position.pnl || 0)}
+                        {currentPrice && (
+                          <span className="ml-1">({((currentPrice - getNumberValue(position.entry_price)) / getNumberValue(position.entry_price) * 100).toFixed(2)}%)</span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
               
               {/* 止损止盈信息 */}
@@ -821,8 +967,8 @@ export default function PositionManager() {
                               <span className="text-sm text-gray-600">保护利润:</span>
                               <span className="text-sm font-medium text-green-600">
                                 {position.position_type === 'LONG' 
-                                  ? formatCurrency((position.highest_price || position.entry_price) - position.entry_price)
-                                  : formatCurrency(position.entry_price - (position.lowest_price || position.entry_price))
+                                  ? formatCurrency((getNumberValue(position.highest_price) || getNumberValue(position.entry_price)) - getNumberValue(position.entry_price))
+                                  : formatCurrency(getNumberValue(position.entry_price) - (getNumberValue(position.lowest_price) || getNumberValue(position.entry_price)))
                                 }
                               </span>
                             </div>

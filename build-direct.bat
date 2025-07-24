@@ -54,7 +54,7 @@ echo     "tailwind.config.js", >> temp-build.ps1
 echo     "postcss.config.js", >> temp-build.ps1
 echo     "tsconfig.json", >> temp-build.ps1
 echo     "env.local.example", >> temp-build.ps1
-echo     "supabase.sql" >> temp-build.ps1
+echo     "scripts/init-database.js" >> temp-build.ps1
 echo ) >> temp-build.ps1
 echo. >> temp-build.ps1
 echo Write-Host "📦 开始复制文件..." -ForegroundColor Yellow >> temp-build.ps1
