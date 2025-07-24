@@ -481,4 +481,55 @@ export class BitgetAdapter implements ExchangeInterface {
         isWorking: false
       }))
     } catch (error) {
-      throw new ExchangeError(`
+      throw new ExchangeError(`Bitget 获取订单历史失败: ${error}`, this.name)
+    }
+  }
+
+  private mapOrderStatus(status: string): string {
+    const statusMap: Record<string, string> = {
+      'NEW': 'NEW',
+      'FILLED': 'FILLED',
+      'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
+      'CANCELED': 'CANCELED',
+      'CANCELLED': 'CANCELED',
+      'REJECTED': 'REJECTED'
+    }
+    return statusMap[status] || status
+  }
+
+  private mapOrderType(type: string): string {
+    const typeMap: Record<string, string> = {
+      'LIMIT': 'LIMIT',
+      'MARKET': 'MARKET',
+      'STOP_LIMIT': 'STOP_LIMIT',
+      'STOP_MARKET': 'STOP_MARKET'
+    }
+    return typeMap[type] || type
+  }
+
+  private mapOrderTypeBack(orderType: string): string {
+    const typeMap: Record<string, string> = {
+      'limit': 'LIMIT',
+      'market': 'MARKET',
+      'limit-maker': 'LIMIT_MAKER'
+    }
+    return typeMap[orderType] || orderType.toUpperCase()
+  }
+
+  private mapInterval(interval: string): string {
+    const intervalMap: Record<string, string> = {
+      '1m': '1min',
+      '5m': '5min',
+      '15m': '15min',
+      '30m': '30min',
+      '1h': '1hour',
+      '4h': '4hour',
+      '1d': '1day'
+    }
+    return intervalMap[interval] || interval
+  }
+
+  private normalizeSymbol(symbol: string): string {
+    return symbol.replace(/[-/]/g, '').toUpperCase()
+  }
+}
